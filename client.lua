@@ -11,6 +11,9 @@ local blipHandle = nil
 local promptGroup = GetRandomIntInRange(0, 0xffffff)
 local yesPrompt = nil
 local noPrompt = nil
+local quitPromptGroup = GetRandomIntInRange(0, 0xffffff)
+local quitYesPrompt = nil
+local quitNoPrompt = nil
 
 -- Harvesting job state
 local isJobActive = false
@@ -49,6 +52,23 @@ local function GetRandomPointInTriangle(p1, p2, p3)
     return vector3(x, y, z)
 end
 
+local function DrawText2D(txt, x, y, scale, r, g, b, a)
+    local str = CreateVarString(10, "LITERAL_STRING", txt)
+    SetTextFontForCurrentCommand(0)
+    SetTextScale(scale, scale)
+    SetTextColor(r or 255, g or 255, b or 255, a or 255)
+    SetTextCentre(true)
+    DisplayText(str, x, y)
+end
+
+local function SafeGetGroundZ(x, y, defaultZ)
+    local status, success, groundZ = pcall(GetGroundZFor_3dCoord, x, y, 1000.0, true)
+    if status and success and groundZ > 30.0 and groundZ < 100.0 then
+        return groundZ
+    end
+    return defaultZ
+end
+
 local function GenerateRandomHarvestLocation()
     local pA, pB, pC, pD = fieldCorners[1], fieldCorners[2], fieldCorners[3], fieldCorners[4]
     
@@ -63,13 +83,8 @@ local function GenerateRandomHarvestLocation()
         point = GetRandomPointInTriangle(pA, pC, pD)
     end
     
-    -- Try to find the exact ground Z coordinate, filtering out invalid 0.0 returns
-    local success, groundZ = GetGroundZFor_3dCoord(point.x, point.y, 100.0, true)
-    if success and groundZ > 30.0 and groundZ < 100.0 then
-        return vector3(point.x, point.y, groundZ)
-    else
-        return point
-    end
+    local groundZ = SafeGetGroundZ(point.x, point.y, point.z)
+    return vector3(point.x, point.y, groundZ)
 end
 
 local function CreatePrompts()
@@ -94,6 +109,28 @@ local function CreatePrompts()
     UiPromptSetStandardMode(noPrompt, true)
     UiPromptSetGroup(noPrompt, promptGroup, 0)
     UiPromptRegisterEnd(noPrompt)
+
+    -- Quit Yes Prompt (Arrow Up)
+    quitYesPrompt = UiPromptRegisterBegin()
+    UiPromptSetControlAction(quitYesPrompt, 0x6319DB71) -- Arrow Up
+    local strQuitYes = VarString(10, 'LITERAL_STRING', "Quit Job")
+    UiPromptSetText(quitYesPrompt, strQuitYes)
+    UiPromptSetEnabled(quitYesPrompt, true)
+    UiPromptSetVisible(quitYesPrompt, true)
+    UiPromptSetStandardMode(quitYesPrompt, true)
+    UiPromptSetGroup(quitYesPrompt, quitPromptGroup, 0)
+    UiPromptRegisterEnd(quitYesPrompt)
+
+    -- Quit No Prompt (Arrow Down)
+    quitNoPrompt = UiPromptRegisterBegin()
+    UiPromptSetControlAction(quitNoPrompt, 0x05CA7C52) -- Arrow Down
+    local strQuitNo = VarString(10, 'LITERAL_STRING', "Continue")
+    UiPromptSetText(quitNoPrompt, strQuitNo)
+    UiPromptSetEnabled(quitNoPrompt, true)
+    UiPromptSetVisible(quitNoPrompt, true)
+    UiPromptSetStandardMode(quitNoPrompt, true)
+    UiPromptSetGroup(quitNoPrompt, quitPromptGroup, 0)
+    UiPromptRegisterEnd(quitNoPrompt)
 
     -- Harvest Action Prompt (E Key)
     harvestInteractPrompt = UiPromptRegisterBegin()
@@ -187,6 +224,11 @@ CreateThread(function()
         if playerPed and playerPed ~= 0 then
             local playerCoords = GetEntityCoords(playerPed)
 
+            if isJobActive then
+                sleep = 0
+                DrawText2D("HARVEST JOB ACTIVE", 0.5, 0.03, 0.45, 0, 255, 0, 220)
+            end
+
             -- Handle NPC spawning and initial job offering
             local dist = #(playerCoords - npcCoords)
             if dist < 150.0 then
@@ -195,36 +237,55 @@ CreateThread(function()
                 end
                 sleep = 500
 
-                -- Prompt player when near the NPC (only if not already on the job)
-                if dist < 2.5 and not isJobActive then
+                -- Prompt player when near the NPC
+                if dist < 2.5 then
                     sleep = 0
-                    local groupName = VarString(10, 'LITERAL_STRING', "Are you interested in harvesting?")
-                    UiPromptSetActiveGroupThisFrame(promptGroup, groupName, 0, 0, 0, 0)
+                    if not isJobActive then
+                        local groupName = VarString(10, 'LITERAL_STRING', "Are you interested in harvesting?")
+                        UiPromptSetActiveGroupThisFrame(promptGroup, groupName, 0, 0, 0, 0)
 
-                    if UiPromptHasStandardModeCompleted(yesPrompt) or IsControlJustPressed(0, 0x6319DB71) then
-                        -- Initialize random seed
-                        math.randomseed(GetGameTimer())
-                        TriggerEvent("vorp:TipRight", "Harvest job started! Follow the map markers.", 4000)
-                        print("coi_harvest: Player accepted harvesting job")
-                        isJobActive = true
-                        currentHarvestStep = 1
-                        
-                        -- Populate harvestLocations dynamically inside the field corners
-                        if infiniteHarvest then
-                            harvestLocations = { GenerateRandomHarvestLocation() }
-                        else
-                            harvestLocations = {}
-                            for i = 1, maxHarvestsPerJob do
-                                table.insert(harvestLocations, GenerateRandomHarvestLocation())
+                        if UiPromptHasStandardModeCompleted(yesPrompt) or IsControlJustPressed(0, 0x6319DB71) then
+                            -- Initialize random seed
+                            math.randomseed(GetGameTimer())
+                            TriggerEvent("vorp:TipRight", "Harvest job started! Follow the map markers.", 4000)
+                            print("coi_harvest: Player accepted harvesting job")
+                            isJobActive = true
+                            currentHarvestStep = 1
+                            
+                            -- Populate harvestLocations dynamically inside the field corners
+                            if infiniteHarvest then
+                                harvestLocations = { GenerateRandomHarvestLocation() }
+                            else
+                                harvestLocations = {}
+                                for i = 1, maxHarvestsPerJob do
+                                    table.insert(harvestLocations, GenerateRandomHarvestLocation())
+                                end
                             end
+                            
+                            updateHarvestBlip()
+                            Wait(2000)
+                        elseif UiPromptHasStandardModeCompleted(noPrompt) or IsControlJustPressed(0, 0x05CA7C52) then
+                            TriggerEvent("vorp:TipRight", "Maybe next time.", 4000)
+                            print("coi_harvest: Player declined harvesting job")
+                            Wait(2000)
                         end
-                        
-                        updateHarvestBlip()
-                        Wait(2000)
-                    elseif UiPromptHasStandardModeCompleted(noPrompt) or IsControlJustPressed(0, 0x05CA7C52) then
-                        TriggerEvent("vorp:TipRight", "Maybe next time.", 4000)
-                        print("coi_harvest: Player declined harvesting job")
-                        Wait(2000)
+                    else
+                        local groupName = VarString(10, 'LITERAL_STRING', "Do you want to quit the harvest job?")
+                        UiPromptSetActiveGroupThisFrame(quitPromptGroup, groupName, 0, 0, 0, 0)
+
+                        if UiPromptHasStandardModeCompleted(quitYesPrompt) or IsControlJustPressed(0, 0x6319DB71) then
+                            isJobActive = false
+                            if harvestBlip then
+                                RemoveBlip(harvestBlip)
+                                harvestBlip = nil
+                            end
+                            TriggerEvent("vorp:TipRight", "Harvest job cancelled.", 4000)
+                            print("coi_harvest: Player quit harvesting job")
+                            Wait(2000)
+                        elseif UiPromptHasStandardModeCompleted(quitNoPrompt) or IsControlJustPressed(0, 0x05CA7C52) then
+                            TriggerEvent("vorp:TipRight", "Continue harvesting!", 3000)
+                            Wait(2000)
+                        end
                     end
                 end
             else
@@ -244,73 +305,74 @@ CreateThread(function()
                         harvestBlip = nil
                     end
                 else
-                    local target = harvestLocations[currentHarvestStep]
-                    if target then
+                    for i, target in ipairs(harvestLocations) do
+                        -- Dynamically snap the Z coordinate to the ground once collision loads
+                        local groundZ = SafeGetGroundZ(target.x, target.y, target.z)
+                        target = vector3(target.x, target.y, groundZ)
+                        harvestLocations[i] = target
+
                         local targetCoords = vector3(target.x, target.y, target.z)
                         local targetDist = #(playerCoords - targetCoords)
 
                         if targetDist < 100.0 then
                             sleep = 0 -- Marker rendering requires 0ms wait to prevent blinking
 
-                            -- Dynamically snap the Z coordinate to the ground once collision loads
-                            local success, groundZ = GetGroundZFor_3dCoord(target.x, target.y, 100.0, true)
-                            if success and groundZ > 30.0 and groundZ < 100.0 then
-                                target = vector3(target.x, target.y, groundZ)
-                                harvestLocations[currentHarvestStep] = target
-                            end
-
                             -- Draw cylinder ring marker on ground (Green)
-                            DrawMarker(0x94FDAE17, target.x, target.y, target.z - 0.98,
-                                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                       1.5, 1.5, 0.4,
-                                       0, 255, 0, 160,
-                                       false, false, 2, false, nil, nil, false)
+                            DrawMarker(
+                                0x94FDAE17,
+                                target.x, target.y, target.z - 0.98,
+                                0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0,
+                                1.5, 1.5, 0.40, -- Scale restored to 1.5m radius and 0.40m height (original size)
+                                0, 255, 0, 160,
+                                false, false, 2, false, nil, nil, false
+                            )
+                        end
 
-                            -- Prompt interaction when standing inside/near the marker
-                            if targetDist < 2.0 then
-                                local promptTitle = VarString(10, 'LITERAL_STRING', "Harvesting")
-                                UiPromptSetActiveGroupThisFrame(harvestPromptGroup, promptTitle, 0, 0, 0, 0)
-                                if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0x760A9C6F) then
-                                    local dict = "script_re@gold_panner@gold_success"
-                                    local anim = "SEARCH02"
+                        -- Only allow harvesting at the current objective
+                        if i == currentHarvestStep and targetDist < 2.0 then
+                            local promptTitle = VarString(10, 'LITERAL_STRING', "Harvesting")
+                            UiPromptSetActiveGroupThisFrame(harvestPromptGroup, promptTitle, 0, 0, 0, 0)
+                            if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0x760A9C6F) then
+                                local dict = "script_re@gold_panner@gold_success"
+                                local anim = "SEARCH02"
 
-                                    RequestAnimDict(dict)
-                                    while not HasAnimDictLoaded(dict) do
-                                        Wait(10)
-                                    end
-
-                                    TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, 10000, 1, 0.0, false, false, false)
-                                    
-                                    TriggerEvent("vorp:TipRight", "Harvesting...", 10000)
-                                    Wait(10000)
-                                    
-                                    ClearPedTasksImmediately(playerPed)
-                                    
-                                    TriggerEvent("vorp:TipRight", "Harvested!", 3000)
-                                    TriggerServerEvent("coi_harvest:givePayment")
-                                    
-                                    if infiniteHarvest then
-                                        -- Continuously generate a new harvest location
-                                        harvestLocations = { GenerateRandomHarvestLocation() }
-                                        currentHarvestStep = 1
-                                        updateHarvestBlip()
-                                    else
-                                        -- Move to the next coordinate in the stack
-                                        currentHarvestStep = currentHarvestStep + 1
-
-                                        if currentHarvestStep > #harvestLocations then
-                                            isJobActive = false
-                                            TriggerEvent("vorp:TipRight", "Harvest Job completed!", 4000)
-                                            if harvestBlip then
-                                                RemoveBlip(harvestBlip)
-                                                harvestBlip = nil
-                                            end
-                                        else
-                                            updateHarvestBlip()
-                                        end
-                                    end
-                                    Wait(1000)
+                                RequestAnimDict(dict)
+                                while not HasAnimDictLoaded(dict) do
+                                    Wait(10)
                                 end
+
+                                TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, 10000, 1, 0.0, false, false, false)
+                                
+                                TriggerEvent("vorp:TipRight", "Harvesting...", 10000)
+                                Wait(10000)
+                                
+                                ClearPedTasksImmediately(playerPed)
+                                
+                                TriggerEvent("vorp:TipRight", "Harvested!", 3000)
+                                TriggerServerEvent("coi_harvest:givePayment")
+                                
+                                if infiniteHarvest then
+                                    -- Continuously generate a new harvest location
+                                    harvestLocations = { GenerateRandomHarvestLocation() }
+                                    currentHarvestStep = 1
+                                    updateHarvestBlip()
+                                else
+                                    -- Move to the next coordinate in the stack
+                                    currentHarvestStep = currentHarvestStep + 1
+
+                                    if currentHarvestStep > #harvestLocations then
+                                        isJobActive = false
+                                        TriggerEvent("vorp:TipRight", "Harvest Job completed!", 4000)
+                                        if harvestBlip then
+                                            RemoveBlip(harvestBlip)
+                                            harvestBlip = nil
+                                        end
+                                    else
+                                        updateHarvestBlip()
+                                    end
+                                end
+                                Wait(1000)
                             end
                         end
                     end
@@ -331,6 +393,8 @@ AddEventHandler("onResourceStop", function(resourceName)
         end
         if yesPrompt then UiPromptDelete(yesPrompt) end
         if noPrompt then UiPromptDelete(noPrompt) end
+        if quitYesPrompt then UiPromptDelete(quitYesPrompt) end
+        if quitNoPrompt then UiPromptDelete(quitNoPrompt) end
         if harvestInteractPrompt then UiPromptDelete(harvestInteractPrompt) end
     end
 end)
