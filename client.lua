@@ -22,6 +22,7 @@ local harvestInteractPrompt = nil
 -- Harvesting locations (stack)
 local harvestLocations = {
     vector4(1010.3024, -1069.0371, 67.2858, 94.0229),
+    vector4(978.4898, -1071.6012, 63.3813, 272.5560),
     -- More coordinates can be appended here
 }
 
