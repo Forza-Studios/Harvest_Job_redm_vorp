@@ -279,10 +279,10 @@ CreateThread(function()
                                         Wait(10)
                                     end
 
-                                    TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, 3000, 1, 0.0, false, false, false)
+                                    TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, 10000, 1, 0.0, false, false, false)
                                     
-                                    TriggerEvent("vorp:TipRight", "Harvesting...", 3000)
-                                    Wait(3000)
+                                    TriggerEvent("vorp:TipRight", "Harvesting...", 10000)
+                                    Wait(10000)
                                     
                                     ClearPedTasksImmediately(playerPed)
                                     
