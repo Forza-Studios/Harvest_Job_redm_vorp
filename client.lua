@@ -229,11 +229,11 @@
         local ok, hours = pcall(GetClockHours)
         if not ok then return "Howdy." end
         if hours >= 5 and hours < 12 then
-            return "Mornin'. Early start suits a good harvest."
+            return "Mornin'."
         elseif hours >= 12 and hours < 18 then
-            return "Afternoon. Plenty of daylight left to work with."
+            return "Afternoon."
         elseif hours >= 18 and hours < 21 then
-            return "Evenin'. We can still get a bit done before dark."
+            return "Evenin'."
         else
             return "Bit late to be out, but I ain't gonna stop you."
         end
@@ -589,69 +589,68 @@
                                     TrySpawnParticleAt(targetCoords)
                                     TriggerEvent("vorp:TipRight", "Starting harvest...", 2000)
 
-                                    -- Trigger the minigame (Difficulty 4000ms, Gap 7)
-                                    local minigame = exports["syn_minigame"]:taskBar(4000, 7)
+                                    local startTime = GetGameTimer()
+                                    local totalDuration = CONFIG.harvestDuration
+                                    local success = true
+                                    local cancelled = false
 
-                                    if minigame == 100 then
-                                        -- Minigame success! Continue with the 10s progress bar
-                                        TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, CONFIG.harvestDuration, 1, 0.0, false, false, false)
-                                        TriggerEvent("vorp:TipRight", "Harvesting...", CONFIG.harvestDuration)
+                                    while GetGameTimer() - startTime < totalDuration do
+                                        -- Trigger the minigame (Difficulty 3000ms, Gap 7)
+                                        local minigame = exports["syn_minigame"]:taskBar(3000, 7)
 
-                                        local startedAt = GetGameTimer()
-                                        local cancelled = false
-                                        while GetGameTimer() - startedAt < CONFIG.harvestDuration do
-                                            local elapsed = GetGameTimer() - startedAt
-                                            local pct = elapsed / CONFIG.harvestDuration
-                                            DrawProgressBar(0.5, 0.85, 0.25, 0.02, pct)
-
-                                            if IsEntityDead(playerPed) or #(GetEntityCoords(playerPed) - targetCoords) > 4.0 then
-                                                cancelled = true
-                                                break
-                                            end
-                                            Wait(0)
+                                        if minigame ~= 100 then
+                                            success = false
+                                            break
                                         end
 
-                                        ClearPedTasksImmediately(playerPed)
-
-                                        if cancelled then
-                                            TriggerEvent("vorp:TipRight", "Harvest interrupted.", 3000)
-                                            sessionStreak = 0
-                                        else
-                                            TryPlaySound(CONFIG.soundHarvestComplete)
-                                            TriggerEvent("vorp:TipRight", "Harvested!", 3000)
-                                            TriggerServerEvent("coi_harvest:givePayment")
-
-                                            sessionHarvestCount = sessionHarvestCount + 1
-                                            sessionStreak = sessionStreak + 1
-
-                                            if CONFIG.fatigueFlavorEvery > 0 and sessionHarvestCount % CONFIG.fatigueFlavorEvery == 0 then
-                                                TriggerEvent("vorp:TipRight", "Your arms are getting tired, but you push on.", 3000)
-                                            end
-
-                                            if infiniteHarvest then
-                                                harvestLocations = { GenerateRandomHarvestLocation() }
-                                                currentHarvestStep = 1
-                                                updateHarvestBlip()
-                                            else
-                                                currentHarvestStep = currentHarvestStep + 1
-
-                                                if currentHarvestStep > #harvestLocations then
-                                                    isJobActive = false
-                                                    TriggerEvent("vorp:TipRight", ("Harvest Job completed! %d harvested."):format(sessionHarvestCount), 4000)
-                                                    if harvestBlip then
-                                                        RemoveBlip(harvestBlip)
-                                                        harvestBlip = nil
-                                                    end
-                                                else
-                                                    updateHarvestBlip()
-                                                end
-                                            end
+                                        -- Safety check: player died or walked away
+                                        if IsEntityDead(playerPed) or #(GetEntityCoords(playerPed) - targetCoords) > 4.0 then
+                                            cancelled = true
+                                            break
                                         end
-                                    else
-                                        -- Minigame failed!
-                                        ClearPedTasksImmediately(playerPed)
+
+                                        Wait(300) -- brief delay between sweeps
+                                    end
+
+                                    ClearPedTasksImmediately(playerPed)
+
+                                    if not success then
                                         TriggerEvent("vorp:TipRight", "Harvest failed!", 3000)
                                         sessionStreak = 0
+                                    elseif cancelled then
+                                        TriggerEvent("vorp:TipRight", "Harvest interrupted.", 3000)
+                                        sessionStreak = 0
+                                    else
+                                        -- Minigame success and time completed!
+                                        TryPlaySound(CONFIG.soundHarvestComplete)
+                                        TriggerEvent("vorp:TipRight", "Harvested!", 3000)
+                                        TriggerServerEvent("coi_harvest:givePayment")
+
+                                        sessionHarvestCount = sessionHarvestCount + 1
+                                        sessionStreak = sessionStreak + 1
+
+                                        if CONFIG.fatigueFlavorEvery > 0 and sessionHarvestCount % CONFIG.fatigueFlavorEvery == 0 then
+                                            TriggerEvent("vorp:TipRight", "Your arms are getting tired, but you push on.", 3000)
+                                        end
+
+                                        if infiniteHarvest then
+                                            harvestLocations = { GenerateRandomHarvestLocation() }
+                                            currentHarvestStep = 1
+                                            updateHarvestBlip()
+                                        else
+                                            currentHarvestStep = currentHarvestStep + 1
+
+                                            if currentHarvestStep > #harvestLocations then
+                                                isJobActive = false
+                                                TriggerEvent("vorp:TipRight", ("Harvest Job completed! %d harvested."):format(sessionHarvestCount), 4000)
+                                                if harvestBlip then
+                                                    RemoveBlip(harvestBlip)
+                                                    harvestBlip = nil
+                                                end
+                                            else
+                                                updateHarvestBlip()
+                                            end
+                                        end
                                     end
                                 end
                             end
