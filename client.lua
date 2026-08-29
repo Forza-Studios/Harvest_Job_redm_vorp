@@ -63,9 +63,9 @@ local function GenerateRandomHarvestLocation()
         point = GetRandomPointInTriangle(pA, pC, pD)
     end
     
-    -- Try to find the exact ground Z coordinate
-    local success, groundZ = GetGroundZFor_3dCoord(point.x, point.y, point.z + 10.0, true)
-    if success then
+    -- Try to find the exact ground Z coordinate, filtering out invalid 0.0 returns
+    local success, groundZ = GetGroundZFor_3dCoord(point.x, point.y, 100.0, true)
+    if success and groundZ > 30.0 and groundZ < 100.0 then
         return vector3(point.x, point.y, groundZ)
     else
         return point
@@ -251,6 +251,13 @@ CreateThread(function()
 
                         if targetDist < 100.0 then
                             sleep = 0 -- Marker rendering requires 0ms wait to prevent blinking
+
+                            -- Dynamically snap the Z coordinate to the ground once collision loads
+                            local success, groundZ = GetGroundZFor_3dCoord(target.x, target.y, 100.0, true)
+                            if success and groundZ > 30.0 and groundZ < 100.0 then
+                                target = vector3(target.x, target.y, groundZ)
+                                harvestLocations[currentHarvestStep] = target
+                            end
 
                             -- Draw cylinder ring marker on ground (Green)
                             DrawMarker(0x94FDAE17, target.x, target.y, target.z - 0.98,
