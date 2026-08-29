@@ -1,5 +1,5 @@
-local npcModel = `mp_a_f_m_saloonband_females_01`
-local npcCoords = vector3(1051.6591, -1126.4647, 67.8970)
+local npcModel = `re_playercampstrangers_females_01`
+local npcCoords = vector3(1051.6591, -1126.4647, 66.8970)
 local npcHeading = 308.5460
 local blipSprite = -1944395098
 local blipTitle = "Harvest Job"
