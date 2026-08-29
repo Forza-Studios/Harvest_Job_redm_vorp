@@ -319,13 +319,13 @@ CreateThread(function()
 
                             -- Draw cylinder ring marker on ground (Green)
                             DrawMarker(
-                                0x94FDAE17,
-                                target.x, target.y, target.z - 0.98,
+                                0x6903B113, -- Cylinder marker
+                                target.x, target.y, target.z + 0.05,
                                 0.0, 0.0, 0.0,
                                 0.0, 0.0, 0.0,
-                                1.5, 1.5, 0.40, -- Scale restored to 1.5m radius and 0.40m height (original size)
-                                0, 255, 0, 160,
-                                false, false, 2, false, nil, nil, false
+                                0.8, 0.8, 0.8,
+                                0, 255, 0, 180,
+                                false, true, 2, false, nil, nil, false
                             )
                         end
 
