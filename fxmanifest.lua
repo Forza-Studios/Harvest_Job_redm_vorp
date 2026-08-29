@@ -6,3 +6,5 @@ author '_forza'
 description 'Harvest job'
 
 client_script 'client.lua'
+server_script 'server.lua'
+

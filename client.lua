@@ -195,16 +195,23 @@ CreateThread(function()
                             local promptTitle = VarString(10, 'LITERAL_STRING', "Harvesting")
                             UiPromptSetActiveGroupThisFrame(harvestPromptGroup, promptTitle, 0, 0, 0, 0)
                             if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0x760A9C6F) then
-                                -- Start harvesting scenario animation on player
-                                TaskStartScenarioInPlace(playerPed, joaat("WORLD_HUMAN_PICK_CROP"), -1, true, false, false, false)
+                                local dict = "script_re@gold_panner@gold_success"
+                                local anim = "SEARCH02"
+
+                                RequestAnimDict(dict)
+                                while not HasAnimDictLoaded(dict) do
+                                    Wait(10)
+                                end
+
+                                TaskPlayAnim(playerPed, dict, anim, 2.0, 2.0, 3000, 1, 0.0, false, false, false)
                                 
                                 TriggerEvent("vorp:TipRight", "Harvesting...", 3000)
                                 Wait(3000)
                                 
-                                -- Clear animation tasks
-                                ClearPedTasks(playerPed)
+                                ClearPedTasksImmediately(playerPed)
                                 
                                 TriggerEvent("vorp:TipRight", "Harvested!", 3000)
+                                TriggerServerEvent("coi_harvest:givePayment")
                                 
                                 -- Move to the next coordinate in the stack
                                 currentHarvestStep = currentHarvestStep + 1
