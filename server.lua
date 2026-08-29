@@ -7,7 +7,7 @@ RegisterServerEvent("coi_harvest:givePayment", function()
 
     local Character = User.getUsedCharacter
     if Character then
-        local amount = 0.5
+        local amount = math.random(200, 500) / 100
         Character.addCurrency(0, amount) -- 0 is Cash
         TriggerClientEvent("vorp:TipRight", _source, "You received $" .. string.format("%.2f", amount) .. " for harvesting", 3000)
     end

@@ -288,7 +288,7 @@
         UiPromptRegisterEnd(quitNoPrompt)
 
         harvestInteractPrompt = UiPromptRegisterBegin()
-        UiPromptSetControlAction(harvestInteractPrompt, 0x760A9C6F) -- E Key (INPUT_CONTEXT)
+        UiPromptSetControlAction(harvestInteractPrompt, 0xD9D0E1C0) -- Spacebar (INPUT_JUMP)
         UiPromptSetText(harvestInteractPrompt, VarString(10, 'LITERAL_STRING', "Harvest"))
         UiPromptSetEnabled(harvestInteractPrompt, true)
         UiPromptSetVisible(harvestInteractPrompt, true)
@@ -572,7 +572,7 @@
                             if i == currentHarvestStep and targetDist < 2.0 then
                                 local promptTitle = VarString(10, 'LITERAL_STRING', "Harvesting")
                                 UiPromptSetActiveGroupThisFrame(harvestPromptGroup, promptTitle, 0, 0, 0, 0)
-                                if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0x760A9C6F) then
+                                if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0xD9D0E1C0) then
                                     local chosenAnim = harvestAnims[math.random(1, #harvestAnims)]
                                     local dict = chosenAnim.dict
                                     local anim = chosenAnim.anim
@@ -589,27 +589,24 @@
                                     TrySpawnParticleAt(targetCoords)
                                     TriggerEvent("vorp:TipRight", "Starting harvest...", 2000)
 
-                                    local startTime = GetGameTimer()
-                                    local totalDuration = CONFIG.harvestDuration
+                                    -- Trigger the minigame twice (Difficulty 3000ms, Gap 7)
                                     local success = true
                                     local cancelled = false
 
-                                    while GetGameTimer() - startTime < totalDuration do
-                                        -- Trigger the minigame (Difficulty 3000ms, Gap 7)
+                                    for step = 1, 2 do
                                         local minigame = exports["syn_minigame"]:taskBar(3000, 7)
 
-                                        if minigame ~= 100 then
+                                        if IsEntityDead(playerPed) or #(GetEntityCoords(playerPed) - targetCoords) > 4.0 then
+                                            cancelled = true
+                                            break
+                                        elseif minigame ~= 100 then
                                             success = false
                                             break
                                         end
 
-                                        -- Safety check: player died or walked away
-                                        if IsEntityDead(playerPed) or #(GetEntityCoords(playerPed) - targetCoords) > 4.0 then
-                                            cancelled = true
-                                            break
+                                        if step < 2 then
+                                            Wait(500)
                                         end
-
-                                        Wait(300) -- brief delay between sweeps
                                     end
 
                                     ClearPedTasksImmediately(playerPed)
