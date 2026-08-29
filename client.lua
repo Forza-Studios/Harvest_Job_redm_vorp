@@ -194,10 +194,16 @@ CreateThread(function()
                         if targetDist < 2.0 then
                             local promptTitle = VarString(10, 'LITERAL_STRING', "Harvesting")
                             UiPromptSetActiveGroupThisFrame(harvestPromptGroup, promptTitle, 0, 0, 0, 0)
-
                             if UiPromptHasStandardModeCompleted(harvestInteractPrompt) or IsControlJustPressed(0, 0x760A9C6F) then
+                                -- Start harvesting scenario animation on player
+                                TaskStartScenarioInPlace(playerPed, joaat("WORLD_HUMAN_PICK_CROP"), -1, true, false, false, false)
+                                
                                 TriggerEvent("vorp:TipRight", "Harvesting...", 3000)
                                 Wait(3000)
+                                
+                                -- Clear animation tasks
+                                ClearPedTasks(playerPed)
+                                
                                 TriggerEvent("vorp:TipRight", "Harvested!", 3000)
                                 
                                 -- Move to the next coordinate in the stack
