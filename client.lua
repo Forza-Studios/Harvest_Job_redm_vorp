@@ -7,6 +7,34 @@ local blipTitle = "Harvest Job"
 local npcHandle = nil
 local blipHandle = nil
 
+local promptGroup = GetRandomIntInRange(0, 0xffffff)
+local yesPrompt = nil
+local noPrompt = nil
+
+local function CreatePrompts()
+    -- Yes Prompt (Arrow Up)
+    yesPrompt = UiPromptRegisterBegin()
+    UiPromptSetControlAction(yesPrompt, 0x6319DB71) -- Arrow Up
+    local strYes = VarString(10, 'LITERAL_STRING', "Yes")
+    UiPromptSetText(yesPrompt, strYes)
+    UiPromptSetEnabled(yesPrompt, true)
+    UiPromptSetVisible(yesPrompt, true)
+    UiPromptSetStandardMode(yesPrompt, true)
+    UiPromptSetGroup(yesPrompt, promptGroup, 0)
+    UiPromptRegisterEnd(yesPrompt)
+
+    -- No Prompt (Arrow Down)
+    noPrompt = UiPromptRegisterBegin()
+    UiPromptSetControlAction(noPrompt, 0x05CA7C52) -- Arrow Down
+    local strNo = VarString(10, 'LITERAL_STRING', "No")
+    UiPromptSetText(noPrompt, strNo)
+    UiPromptSetEnabled(noPrompt, true)
+    UiPromptSetVisible(noPrompt, true)
+    UiPromptSetStandardMode(noPrompt, true)
+    UiPromptSetGroup(noPrompt, promptGroup, 0)
+    UiPromptRegisterEnd(noPrompt)
+end
+
 local function spawnNPC()
     if npcHandle and DoesEntityExist(npcHandle) then
         return
@@ -64,6 +92,7 @@ CreateThread(function()
     repeat Wait(1000) until LocalPlayer.state.IsInSession
 
     addBlip()
+    CreatePrompts()
 
     while true do
         local sleep = 1000
@@ -77,6 +106,23 @@ CreateThread(function()
                     spawnNPC()
                 end
                 sleep = 500
+
+                -- Prompt player when near the NPC
+                if dist < 2.5 then
+                    sleep = 0
+                    local groupName = VarString(10, 'LITERAL_STRING', "Are you interested in harvesting?")
+                    UiPromptSetActiveGroupThisFrame(promptGroup, groupName, 0, 0, 0, 0)
+
+                    if UiPromptHasStandardModeCompleted(yesPrompt) or IsControlJustPressed(0, 0x6319DB71) then
+                        TriggerEvent("vorp:TipRight", "Starting harvesting job...", 4000)
+                        print("coi_harvest: Player accepted harvesting job")
+                        Wait(2000) -- cooldown to avoid double triggers
+                    elseif UiPromptHasStandardModeCompleted(noPrompt) or IsControlJustPressed(0, 0x05CA7C52) then
+                        TriggerEvent("vorp:TipRight", "Maybe next time.", 4000)
+                        print("coi_harvest: Player declined harvesting job")
+                        Wait(2000) -- cooldown
+                    end
+                end
             else
                 if npcHandle then
                     removeNPC()
@@ -91,5 +137,7 @@ AddEventHandler("onResourceStop", function(resourceName)
     if resourceName == GetCurrentResourceName() then
         removeNPC()
         removeBlip()
+        if yesPrompt then UiPromptDelete(yesPrompt) end
+        if noPrompt then UiPromptDelete(noPrompt) end
     end
 end)
