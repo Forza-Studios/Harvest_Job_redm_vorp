@@ -29,6 +29,9 @@ local function spawnNPC()
     PlaceEntityOnGroundProperly(npcHandle)
     SetEntityCanBeDamaged(npcHandle, false)
     SetBlockingOfNonTemporaryEvents(npcHandle, true)
+    
+    TaskStartScenarioInPlace(npcHandle, joaat("WORLD_HUMAN_DRINKING"), -1, true, false, false, false)
+    Wait(1000)
     FreezeEntityPosition(npcHandle, true)
 end
 
